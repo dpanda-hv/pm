@@ -285,20 +285,34 @@ Part 8 evidence (16 June 2026):
 
 ### Checklist
 
-- [ ] Define strict schema for AI response: user message plus optional board updates.
-- [ ] Send board JSON and in-memory conversation history with each AI request.
-- [ ] Validate AI response against schema.
-- [ ] Implement retry/fallback behavior for invalid schema responses.
-- [ ] Apply optional board updates atomically when valid.
-- [ ] Add thorough tests and request approval for Part 10.
+- [x] Define strict schema for AI response: user message plus optional board updates.
+- [x] Send board JSON and in-memory conversation history with each AI request.
+- [x] Validate AI response against schema.
+- [x] Implement retry/fallback behavior for invalid schema responses.
+- [x] Apply optional board updates atomically when valid.
+- [x] Add thorough tests and request approval for Part 10.
 
 ### Tests
 
-- [ ] Schema validation pass/fail tests.
-- [ ] Retry and fallback behavior tests.
-- [ ] Atomic application test for AI-suggested board updates.
-- [ ] Conversation-history inclusion tests.
-- [ ] Coverage is at least 80% for touched backend scope.
+- [x] Schema validation pass/fail tests.
+- [x] Retry and fallback behavior tests.
+- [x] Atomic application test for AI-suggested board updates.
+- [x] Conversation-history inclusion tests.
+- [x] Coverage is at least 80% for touched backend scope.
+
+Part 9 evidence (16 June 2026):
+
+- Structured AI chat endpoint implemented in `backend/app/main.py`:
+	- `POST /api/ai/chat`
+	- strict response parsing with `AIStructuredResponse` and JSON validation
+	- request context includes full board JSON + in-memory chat history
+	- retry-on-invalid-structure then fallback response
+	- optional `boardUpdate` validated and saved atomically when valid
+- Part 9 feature tests added (feature-based filenames):
+	- `backend/tests/test_ai_structured_chat.py`
+	- `backend/tests/test_static_file_serving.py`
+- Backend suite result: `29 passed` via `uv run pytest -q`.
+- Backend coverage result: `81%` total for `app/main.py` via `uv run pytest --cov=app --cov-report=term -q`.
 
 ### Success criteria
 

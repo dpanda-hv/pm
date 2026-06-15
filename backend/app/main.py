@@ -31,9 +31,17 @@ OPENROUTER_MODEL = "openai/gpt-oss-120b"
 TWO_PLUS_TWO_PROMPT = "What is 2+2? Reply with only the number."
 OPENROUTER_HTTP_REFERER = os.getenv("OPENROUTER_HTTP_REFERER", "http://localhost:8000")
 OPENROUTER_APP_TITLE = os.getenv("OPENROUTER_APP_TITLE", "PM MVP Local")
+MAX_CHAT_HISTORY_MESSAGES = 12
+AI_CHAT_SYSTEM_PROMPT = (
+    "You are an assistant for a kanban board. "
+    "You MUST return valid JSON only (no markdown), matching this shape: "
+    '{"reply":"string","boardUpdate":null|{"schemaVersion":1,"columns":[],"cards":{}}}. '
+    "Use boardUpdate null when no board changes are needed."
+)
 
 # In-memory sessions intentionally reset on process/container restart for MVP.
 SESSIONS: dict[str, str] = {}
+CHAT_HISTORY: dict[str, list[dict[str, str]]] = {}
 
 
 class LoginPayload(BaseModel):
@@ -59,6 +67,15 @@ class MoveCardPayload(BaseModel):
 
 class AIConnectivityPayload(BaseModel):
     prompt: str = TWO_PLUS_TWO_PROMPT
+
+
+class AIChatPayload(BaseModel):
+    message: str
+
+
+class AIStructuredResponse(BaseModel):
+    reply: str
+    boardUpdate: dict[str, object] | None = None
 
 
 def _create_default_board() -> dict[str, object]:
@@ -289,14 +306,19 @@ def _extract_openrouter_text(payload: dict[str, object]) -> str:
 
 
 def _openrouter_chat_completion(prompt: str, api_key: str) -> str:
+    return _openrouter_chat_completion_messages(
+        [{"role": "user", "content": prompt}],
+        api_key,
+    )
+
+
+def _openrouter_chat_completion_messages(
+    messages: list[dict[str, str]],
+    api_key: str,
+) -> str:
     body = {
         "model": OPENROUTER_MODEL,
-        "messages": [
-            {
-                "role": "user",
-                "content": prompt,
-            }
-        ],
+        "messages": messages,
         "temperature": 0,
     }
 
@@ -331,6 +353,101 @@ def _openrouter_chat_completion(prompt: str, api_key: str) -> str:
         raise RuntimeError("OpenRouter returned non-JSON response") from exc
 
     return _extract_openrouter_text(parsed)
+
+
+def _parse_structured_ai_response(raw_text: str) -> AIStructuredResponse:
+    try:
+        decoded = json.loads(raw_text)
+    except json.JSONDecodeError as exc:
+        raise RuntimeError("AI response was not valid JSON") from exc
+
+    if not isinstance(decoded, dict):
+        raise RuntimeError("AI response must be a JSON object")
+
+    reply = decoded.get("reply")
+    board_update = decoded.get("boardUpdate")
+
+    if not isinstance(reply, str):
+        raise RuntimeError("AI response missing string reply")
+
+    if board_update is not None and not isinstance(board_update, dict):
+        raise RuntimeError("AI response boardUpdate must be null or object")
+
+    return AIStructuredResponse(reply=reply, boardUpdate=board_update)
+
+
+def _build_ai_chat_messages(
+    board: dict[str, object],
+    history: list[dict[str, str]],
+    user_message: str,
+) -> list[dict[str, str]]:
+    context_blob = json.dumps(
+        {
+            "board": board,
+            "history": history,
+            "userMessage": user_message,
+        }
+    )
+
+    return [
+        {"role": "system", "content": AI_CHAT_SYSTEM_PROMPT},
+        {
+            "role": "user",
+            "content": (
+                "Generate the structured JSON response for this context: "
+                + context_blob
+            ),
+        },
+    ]
+
+
+def _append_chat_history(user_id: str, role: str, content: str) -> None:
+    history = CHAT_HISTORY.setdefault(user_id, [])
+    history.append({"role": role, "content": content})
+    if len(history) > MAX_CHAT_HISTORY_MESSAGES:
+        CHAT_HISTORY[user_id] = history[-MAX_CHAT_HISTORY_MESSAGES:]
+
+
+def _chat_history_for_user(user_id: str) -> list[dict[str, str]]:
+    return list(CHAT_HISTORY.get(user_id, []))
+
+
+def _resolve_structured_ai_response_with_retry(
+    board: dict[str, object],
+    history: list[dict[str, str]],
+    user_message: str,
+    api_key: str,
+) -> AIStructuredResponse:
+    attempt = 0
+    retry_hint = ""
+
+    while attempt < 2:
+        prompt_message = user_message
+        if retry_hint:
+            prompt_message = f"{user_message}\n\n{retry_hint}"
+
+        messages = _build_ai_chat_messages(board, history, prompt_message)
+        raw_text = _openrouter_chat_completion_messages(messages, api_key)
+
+        try:
+            structured = _parse_structured_ai_response(raw_text)
+            if structured.boardUpdate is not None:
+                try:
+                    _validate_board_payload(structured.boardUpdate)
+                except HTTPException as exc:
+                    raise RuntimeError(str(exc.detail)) from exc
+            return structured
+        except RuntimeError:
+            attempt += 1
+            retry_hint = (
+                "Your previous response was invalid. "
+                "Return ONLY valid JSON with reply string and boardUpdate null/object."
+            )
+
+    return AIStructuredResponse(
+        reply="I could not produce a valid structured response right now.",
+        boardUpdate=None,
+    )
 
 
 def _answer_indicates_four(answer: str) -> bool:
@@ -542,6 +659,42 @@ def ai_connectivity_two_plus_two(request: Request) -> dict[str, object]:
         "prompt": TWO_PLUS_TWO_PROMPT,
         "answer": answer,
         "sanityPassed": _answer_indicates_four(answer),
+    }
+
+
+@app.post("/api/ai/chat")
+def ai_chat(request: Request, payload: AIChatPayload) -> dict[str, object]:
+    user_id = _require_authenticated_user(request)
+    api_key = _require_openrouter_api_key()
+
+    board = _read_board_for_user(user_id)
+    history = _chat_history_for_user(user_id)
+
+    try:
+        structured = _resolve_structured_ai_response_with_retry(
+            board=board,
+            history=history,
+            user_message=payload.message,
+            api_key=api_key,
+        )
+    except RuntimeError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+    board_updated = False
+    next_board = board
+    if structured.boardUpdate is not None:
+        next_board = structured.boardUpdate
+        _save_board_for_user(user_id, next_board)
+        board_updated = True
+
+    _append_chat_history(user_id, "user", payload.message)
+    _append_chat_history(user_id, "assistant", structured.reply)
+
+    return {
+        "ok": True,
+        "reply": structured.reply,
+        "boardUpdated": board_updated,
+        "board": next_board,
     }
 
 
