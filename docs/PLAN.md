@@ -179,20 +179,35 @@ Part 5 evidence (15 June 2026):
 
 ### Checklist
 
-- [ ] Implement DB initialization if file does not exist.
-- [ ] Add authenticated API routes for board read/write operations.
-- [ ] Support card create/edit/move with order persistence.
-- [ ] Enforce validation for incoming board mutation payloads.
-- [ ] Add backend unit and integration tests.
+- [x] Implement DB initialization if file does not exist.
+- [x] Add authenticated API routes for board read/write operations.
+- [x] Support card create/edit/move with order persistence.
+- [x] Enforce validation for incoming board mutation payloads.
+- [x] Add backend unit and integration tests.
 - [ ] Request approval for Part 7.
 
 ### Tests
 
-- [ ] DB auto-create on first run.
-- [ ] Authorized board read/write happy paths.
-- [ ] Invalid payload and unauthorized access handling.
-- [ ] Card move operations maintain deterministic ordering.
-- [ ] Coverage is at least 80% for backend touched scope.
+- [x] DB auto-create on first run.
+- [x] Authorized board read/write happy paths.
+- [x] Invalid payload and unauthorized access handling.
+- [x] Card move operations maintain deterministic ordering.
+- [x] Coverage is at least 80% for backend touched scope.
+
+Part 6 evidence (15 June 2026):
+
+- Backend now includes SQLite-backed board persistence with auto-init (`user_boards` table creation when DB missing).
+- Authenticated board routes implemented in `backend/app/main.py`:
+	- `GET /api/board`
+	- `PUT /api/board`
+	- `POST /api/board/cards`
+	- `PATCH /api/board/cards/{card_id}`
+	- `POST /api/board/cards/{card_id}/move`
+- Strict board validation implemented before writes (schema version, fixed column ids, card/reference invariants, ordering consistency).
+- Backend test coverage added with feature-based files:
+	- `backend/tests/test_board_api.py`
+	- `backend/tests/test_board_card_operations.py`
+- Backend suite result via containerized `uv run pytest -q`: `15 passed`.
 
 ### Success criteria
 
