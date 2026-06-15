@@ -114,21 +114,34 @@ Part 3 evidence (15 June 2026, macOS):
 
 ### Checklist
 
-- [ ] Add login screen at first visit.
-- [ ] Validate fixed credentials (`user` / `password`).
-- [ ] Add logout capability.
-- [ ] Implement in-memory session handling that resets on restart.
-- [ ] Guard board access for unauthenticated users.
-- [ ] Add tests and request approval for Part 5.
+- [x] Add login screen at first visit.
+- [x] Validate fixed credentials (`user` / `password`).
+- [x] Add logout capability.
+- [x] Implement in-memory session handling that resets on restart.
+- [x] Guard board access for unauthenticated users.
+- [x] Add tests and request approval for Part 5.
 
 ### Tests
 
-- [ ] Login success path test.
-- [ ] Login failure path test.
-- [ ] Protected route test for unauthenticated state.
-- [ ] Logout invalidates access.
-- [ ] Session reset verified after container restart.
-- [ ] Coverage remains at least 80% for touched scopes.
+- [x] Login success path test.
+- [x] Login failure path test.
+- [x] Protected route test for unauthenticated state.
+- [x] Logout invalidates access.
+- [x] Session reset verified after container restart.
+- [x] Coverage remains at least 80% for touched scopes.
+
+Part 4 evidence (15 June 2026, macOS):
+
+- Backend auth API tests added and passing: `backend/tests/test_auth_session_api.py`.
+- Backend suite result: `8 passed` via containerized `uv run pytest -q`.
+- Frontend auth unit tests added and passing: `frontend/src/components/AuthKanbanApp.test.tsx`.
+- Frontend unit suite result: `10 passed`.
+- Container browser integration tests passed (login success/failure/logout + static serving):
+	- `frontend/tests/container/auth_session_flow.spec.ts`
+	- `frontend/tests/container/static_frontend_serving.spec.ts`
+- Session reset on restart verified with cookie-jar workflow:
+	- pre-restart `GET /api/auth/session` -> `{"authenticated":true,"username":"user"}`
+	- post-restart with same cookie -> `{"authenticated":false,"username":null}`
 
 ### Success criteria
 

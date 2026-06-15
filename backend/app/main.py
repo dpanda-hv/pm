@@ -1,12 +1,25 @@
+import secrets
 from pathlib import Path
 
-from fastapi import FastAPI
-from fastapi.responses import FileResponse, Response
+from fastapi import FastAPI, Request
+from fastapi.responses import FileResponse, JSONResponse, Response
+from pydantic import BaseModel
 
 app = FastAPI(title="Project Management MVP API", version="0.1.0")
 
 STATIC_DIR = Path(__file__).parent / "static"
 STATIC_ROOT = STATIC_DIR.resolve()
+SESSION_COOKIE = "pm_session"
+VALID_USERNAME = "user"
+VALID_PASSWORD = "password"
+
+# In-memory sessions intentionally reset on process/container restart for MVP.
+SESSIONS: dict[str, str] = {}
+
+
+class LoginPayload(BaseModel):
+    username: str
+    password: str
 
 
 def _safe_static_path(path: str) -> Path | None:
@@ -24,6 +37,49 @@ def health() -> dict[str, str]:
 @app.get("/api/hello")
 def hello() -> dict[str, str]:
     return {"message": "Hello from FastAPI"}
+
+
+@app.get("/api/auth/session")
+def auth_session(request: Request) -> dict[str, str | bool | None]:
+    session_id = request.cookies.get(SESSION_COOKIE)
+    username = SESSIONS.get(session_id or "")
+    if username:
+        return {"authenticated": True, "username": username}
+    return {"authenticated": False, "username": None}
+
+
+@app.post("/api/auth/login")
+def auth_login(payload: LoginPayload) -> Response:
+    if payload.username != VALID_USERNAME or payload.password != VALID_PASSWORD:
+        return JSONResponse(status_code=401, content={"detail": "Invalid credentials"})
+
+    session_id = secrets.token_urlsafe(24)
+    SESSIONS[session_id] = payload.username
+
+    response = JSONResponse(
+        status_code=200,
+        content={"authenticated": True, "username": payload.username},
+    )
+    response.set_cookie(
+        key=SESSION_COOKIE,
+        value=session_id,
+        httponly=True,
+        samesite="lax",
+        secure=False,
+        path="/",
+    )
+    return response
+
+
+@app.post("/api/auth/logout")
+def auth_logout(request: Request) -> Response:
+    session_id = request.cookies.get(SESSION_COOKIE)
+    if session_id:
+        SESSIONS.pop(session_id, None)
+
+    response = JSONResponse(status_code=200, content={"authenticated": False})
+    response.delete_cookie(key=SESSION_COOKIE, path="/")
+    return response
 
 
 @app.get("/")

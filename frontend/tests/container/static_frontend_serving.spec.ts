@@ -4,12 +4,12 @@ test("serves exported kanban HTML at root consistently", async ({ request }) => 
   const firstResponse = await request.get("/");
   expect(firstResponse.ok()).toBeTruthy();
   const firstHtml = await firstResponse.text();
-  expect(firstHtml).toContain("Kanban Studio");
+  expect(firstHtml).toContain("Checking session");
 
   const secondResponse = await request.get("/");
   expect(secondResponse.ok()).toBeTruthy();
   const secondHtml = await secondResponse.text();
-  expect(secondHtml).toContain("Kanban Studio");
+  expect(secondHtml).toContain("Checking session");
 });
 
 test("serves static assets referenced by exported root HTML", async ({ request }) => {
