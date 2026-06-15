@@ -251,17 +251,31 @@ Part 7 evidence (16 June 2026):
 
 ### Checklist
 
-- [ ] Add backend AI client using OpenRouter and model `openai/gpt-oss-120b`.
-- [ ] Read API key from `.env`.
-- [ ] Implement simple AI connectivity endpoint/test path.
-- [ ] Validate with a deterministic "2+2" connectivity check.
-- [ ] Add tests and request approval for Part 9.
+- [x] Add backend AI client using OpenRouter and model `openai/gpt-oss-120b`.
+- [x] Read API key from `.env`.
+- [x] Implement simple AI connectivity endpoint/test path.
+- [x] Validate with a deterministic "2+2" connectivity check.
+- [x] Add tests and request approval for Part 9.
 
 ### Tests
 
-- [ ] Integration test for configured API-key path.
-- [ ] Mocked fallback tests for upstream error handling.
-- [ ] Connectivity test for "2+2" sanity check.
+- [x] Integration test for configured API-key path.
+- [x] Mocked fallback tests for upstream error handling.
+- [x] Connectivity test for "2+2" sanity check.
+
+Part 8 evidence (16 June 2026):
+
+- OpenRouter client implemented in `backend/app/main.py` using model `openai/gpt-oss-120b`.
+- Authenticated AI connectivity endpoints implemented:
+	- `POST /api/ai/connectivity`
+	- `GET /api/ai/connectivity/2plus2`
+- Backend test coverage added in `backend/tests/test_ai_connectivity.py`.
+- Backend suite result via containerized `uv run pytest -q`: `20 passed`.
+- Live 2+2 connectivity check now passes via `GET /api/ai/connectivity/2plus2`:
+	- `{"ok":true,"model":"openai/gpt-oss-120b","prompt":"What is 2+2? Reply with only the number.","answer":"4","sanityPassed":true}`
+- Root cause and fix for initial 401:
+	- Current OpenRouter key policy required attribution headers.
+	- Added `HTTP-Referer` and `X-Title` headers in backend OpenRouter client.
 
 ### Success criteria
 

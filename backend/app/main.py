@@ -1,4 +1,5 @@
 import json
+import http.client
 import os
 import secrets
 import sqlite3
@@ -25,6 +26,11 @@ DEFAULT_COLUMNS = [
 ]
 DEFAULT_COLUMN_IDS = [column["id"] for column in DEFAULT_COLUMNS]
 DEFAULT_COLUMN_ID_SET = set(DEFAULT_COLUMN_IDS)
+OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
+OPENROUTER_MODEL = "openai/gpt-oss-120b"
+TWO_PLUS_TWO_PROMPT = "What is 2+2? Reply with only the number."
+OPENROUTER_HTTP_REFERER = os.getenv("OPENROUTER_HTTP_REFERER", "http://localhost:8000")
+OPENROUTER_APP_TITLE = os.getenv("OPENROUTER_APP_TITLE", "PM MVP Local")
 
 # In-memory sessions intentionally reset on process/container restart for MVP.
 SESSIONS: dict[str, str] = {}
@@ -49,6 +55,10 @@ class EditCardPayload(BaseModel):
 class MoveCardPayload(BaseModel):
     toColumnId: str
     toIndex: int | None = None
+
+
+class AIConnectivityPayload(BaseModel):
+    prompt: str = TWO_PLUS_TWO_PROMPT
 
 
 def _create_default_board() -> dict[str, object]:
@@ -241,6 +251,93 @@ def _create_card_id() -> str:
     return f"card-{secrets.token_hex(6)}"
 
 
+def _require_openrouter_api_key() -> str:
+    api_key = os.getenv("OPENROUTER_API_KEY", "").strip()
+    if not api_key:
+        raise HTTPException(status_code=500, detail="OPENROUTER_API_KEY is not configured")
+    return api_key
+
+
+def _extract_openrouter_text(payload: dict[str, object]) -> str:
+    choices = payload.get("choices")
+    if not isinstance(choices, list) or not choices:
+        raise RuntimeError("OpenRouter response missing choices")
+
+    first_choice = choices[0]
+    if not isinstance(first_choice, dict):
+        raise RuntimeError("OpenRouter response has invalid choice format")
+
+    message = first_choice.get("message")
+    if not isinstance(message, dict):
+        raise RuntimeError("OpenRouter response missing message")
+
+    content = message.get("content")
+    if isinstance(content, str):
+        return content.strip()
+
+    if isinstance(content, list):
+        text_parts: list[str] = []
+        for item in content:
+            if not isinstance(item, dict):
+                continue
+            if item.get("type") == "text" and isinstance(item.get("text"), str):
+                text_parts.append(item["text"])
+        if text_parts:
+            return "\n".join(text_parts).strip()
+
+    raise RuntimeError("OpenRouter response did not include text content")
+
+
+def _openrouter_chat_completion(prompt: str, api_key: str) -> str:
+    body = {
+        "model": OPENROUTER_MODEL,
+        "messages": [
+            {
+                "role": "user",
+                "content": prompt,
+            }
+        ],
+        "temperature": 0,
+    }
+
+    encoded_body = json.dumps(body)
+    connection = http.client.HTTPSConnection("openrouter.ai", timeout=30)
+
+    try:
+        connection.request(
+            "POST",
+            "/api/v1/chat/completions",
+            body=encoded_body,
+            headers={
+                "Authorization": f"Bearer {api_key}",
+                "Content-Type": "application/json",
+                "HTTP-Referer": OPENROUTER_HTTP_REFERER,
+                "X-Title": OPENROUTER_APP_TITLE,
+            },
+        )
+        response = connection.getresponse()
+        raw = response.read().decode("utf-8", errors="replace")
+    except OSError as exc:
+        raise RuntimeError(f"OpenRouter network error: {exc}") from exc
+    finally:
+        connection.close()
+
+    if response.status >= 400:
+        raise RuntimeError(f"OpenRouter HTTP {response.status}: {raw}")
+
+    try:
+        parsed = json.loads(raw)
+    except json.JSONDecodeError as exc:
+        raise RuntimeError("OpenRouter returned non-JSON response") from exc
+
+    return _extract_openrouter_text(parsed)
+
+
+def _answer_indicates_four(answer: str) -> bool:
+    compact = "".join(ch for ch in answer if ch.isdigit())
+    return "4" in compact or answer.strip() == "4"
+
+
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     ensure_db_ready()
@@ -409,6 +506,43 @@ def move_card(request: Request, card_id: str, payload: MoveCardPayload) -> dict[
 
     _save_board_for_user(user_id, board)
     return board
+
+
+@app.post("/api/ai/connectivity")
+def ai_connectivity(request: Request, payload: AIConnectivityPayload) -> dict[str, object]:
+    _require_authenticated_user(request)
+    api_key = _require_openrouter_api_key()
+
+    try:
+        answer = _openrouter_chat_completion(payload.prompt, api_key)
+    except RuntimeError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+    return {
+        "ok": True,
+        "model": OPENROUTER_MODEL,
+        "prompt": payload.prompt,
+        "answer": answer,
+    }
+
+
+@app.get("/api/ai/connectivity/2plus2")
+def ai_connectivity_two_plus_two(request: Request) -> dict[str, object]:
+    _require_authenticated_user(request)
+    api_key = _require_openrouter_api_key()
+
+    try:
+        answer = _openrouter_chat_completion(TWO_PLUS_TWO_PROMPT, api_key)
+    except RuntimeError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+    return {
+        "ok": True,
+        "model": OPENROUTER_MODEL,
+        "prompt": TWO_PLUS_TWO_PROMPT,
+        "answer": answer,
+        "sanityPassed": _answer_indicates_four(answer),
+    }
 
 
 @app.get("/")
