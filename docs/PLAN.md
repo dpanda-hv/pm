@@ -28,16 +28,16 @@
 
 ### Checklist
 
-- [ ] Expand this plan with executable checklists, tests, and success criteria.
-- [ ] Create `frontend/AGENTS.md` documenting current frontend structure, architecture, and commands.
-- [ ] Add explicit hard-gate rule and approval checkpoint language.
-- [ ] Confirm all decisions in the "Confirmed decisions" section remain accurate.
+- [x] Expand this plan with executable checklists, tests, and success criteria.
+- [x] Create `frontend/AGENTS.md` documenting current frontend structure, architecture, and commands.
+- [x] Add explicit hard-gate rule and approval checkpoint language.
+- [x] Confirm all decisions in the "Confirmed decisions" section remain accurate.
 - [ ] Obtain user approval to proceed to Part 2.
 
 ### Tests
 
-- [ ] Documentation review for completeness against all 10 parts.
-- [ ] Consistency check between `AGENTS.md` and this plan.
+- [x] Documentation review for completeness against all 10 parts.
+- [x] Consistency check between `AGENTS.md` and this plan.
 
 ### Success criteria
 
