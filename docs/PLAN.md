@@ -217,18 +217,31 @@ Part 6 evidence (15 June 2026):
 
 ### Checklist
 
-- [ ] Replace local-only state with backend API integration.
-- [ ] Load board from backend on app start.
-- [ ] Persist board changes on user actions.
-- [ ] Handle loading/error states with simple UX.
-- [ ] Add robust integration tests for end-to-end board interactions.
+- [x] Replace local-only state with backend API integration.
+- [x] Load board from backend on app start.
+- [x] Persist board changes on user actions.
+- [x] Handle loading/error states with simple UX.
+- [x] Add robust integration tests for end-to-end board interactions.
 - [ ] Request approval for Part 8.
 
 ### Tests
 
-- [ ] End-to-end test for login, load board, mutate board, refresh, and persistence.
-- [ ] Error-path tests for backend unavailable and invalid responses.
-- [ ] Coverage remains at least 80% for touched scopes.
+- [x] End-to-end test for login, load board, mutate board, refresh, and persistence.
+- [x] Error-path tests for backend unavailable and invalid responses.
+- [x] Coverage remains at least 80% for touched scopes.
+
+Part 7 evidence (16 June 2026):
+
+- Frontend now loads board from `GET /api/board` and persists edits via `PUT /api/board`.
+- Integration wiring implemented in `frontend/src/components/AuthKanbanApp.tsx` and `frontend/src/components/KanbanBoard.tsx`.
+- Frontend unit tests include backend error-path coverage for unavailable and malformed board responses (`AuthKanbanApp.test.tsx`).
+- Container integration tests validate login, mutation, refresh, and persisted board state:
+	- `frontend/tests/container/auth_session_flow.spec.ts` (includes persistence test)
+	- `frontend/tests/container/static_frontend_serving.spec.ts`
+- Container Playwright suite result: `6 passed`.
+- Frontend unit suite result: `12 passed`.
+- Backend suite remains green after integration changes: `15 passed`.
+- Frontend source coverage from `npm run test:unit -- --coverage`: `All files` at `83.3%`.
 
 ### Success criteria
 

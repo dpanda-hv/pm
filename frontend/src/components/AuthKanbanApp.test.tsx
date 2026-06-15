@@ -3,6 +3,18 @@ import userEvent from "@testing-library/user-event";
 import { vi } from "vitest";
 import { AuthKanbanApp } from "@/components/AuthKanbanApp";
 
+const boardFixture = {
+  schemaVersion: 1,
+  columns: [
+    { id: "col-todo", title: "To Do", cardIds: [] },
+    { id: "col-in-progress", title: "In Progress", cardIds: [] },
+    { id: "col-blocked", title: "Blocked", cardIds: [] },
+    { id: "col-in-review", title: "In Review", cardIds: [] },
+    { id: "col-done", title: "Done", cardIds: [] },
+  ],
+  cards: {},
+};
+
 describe("AuthKanbanApp", () => {
   afterEach(() => {
     vi.restoreAllMocks();
@@ -35,6 +47,12 @@ describe("AuthKanbanApp", () => {
           status: 200,
           headers: { "Content-Type": "application/json" },
         })
+      )
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify(boardFixture), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        })
       );
 
     render(<AuthKanbanApp />);
@@ -50,6 +68,11 @@ describe("AuthKanbanApp", () => {
         2,
         "/api/auth/login",
         expect.objectContaining({ method: "POST" })
+      );
+      expect(fetchMock).toHaveBeenNthCalledWith(
+        3,
+        "/api/board",
+        expect.objectContaining({ method: "GET" })
       );
     });
   });
@@ -88,6 +111,12 @@ describe("AuthKanbanApp", () => {
         })
       )
       .mockResolvedValueOnce(
+        new Response(JSON.stringify(boardFixture), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        })
+      )
+      .mockResolvedValueOnce(
         new Response(JSON.stringify({ authenticated: false }), {
           status: 200,
           headers: { "Content-Type": "application/json" },
@@ -103,10 +132,51 @@ describe("AuthKanbanApp", () => {
 
     await waitFor(() => {
       expect(fetchMock).toHaveBeenNthCalledWith(
-        2,
+        3,
         "/api/auth/logout",
         expect.objectContaining({ method: "POST" })
       );
     });
+  });
+
+  it("shows backend unavailable error when board load fails", async () => {
+    const fetchMock = vi.spyOn(globalThis, "fetch");
+    fetchMock
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ authenticated: true, username: "user" }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        })
+      )
+      .mockRejectedValueOnce(new Error("network down"));
+
+    render(<AuthKanbanApp />);
+
+    expect(
+      await screen.findByText(/unable to load board from backend/i)
+    ).toBeInTheDocument();
+  });
+
+  it("shows backend invalid response error when board payload is malformed", async () => {
+    const fetchMock = vi.spyOn(globalThis, "fetch");
+    fetchMock
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ authenticated: true, username: "user" }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        })
+      )
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ bad: "payload" }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        })
+      );
+
+    render(<AuthKanbanApp />);
+
+    expect(
+      await screen.findByText(/unable to load board from backend/i)
+    ).toBeInTheDocument();
   });
 });

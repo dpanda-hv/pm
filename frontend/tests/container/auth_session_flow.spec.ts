@@ -35,3 +35,24 @@ test("logout returns user to login screen", async ({ page }) => {
 
   await expect(page.getByRole("heading", { name: /sign in to kanban/i })).toBeVisible();
 });
+
+test("persists board changes across page refresh", async ({ page }) => {
+  await page.goto("/");
+  await page.getByLabel("Username").fill("user");
+  await page.getByLabel("Password").fill("password");
+  await page.getByRole("button", { name: /^sign in$/i }).click();
+
+  await expect(page.getByRole("heading", { name: /kanban studio/i })).toBeVisible();
+
+  const firstColumn = page.locator('[data-testid^="column-"]').first();
+  await firstColumn.getByRole("button", { name: /add a card/i }).click();
+  await firstColumn.getByPlaceholder("Card title").fill("Persisted card");
+  await firstColumn.getByPlaceholder("Details").fill("Should survive refresh");
+  await firstColumn.getByRole("button", { name: /add card/i }).click();
+
+  await expect(firstColumn.getByText("Persisted card")).toBeVisible();
+
+  await page.reload();
+  await expect(page.getByRole("heading", { name: /kanban studio/i })).toBeVisible();
+  await expect(page.getByText("Persisted card")).toBeVisible();
+});
