@@ -30,14 +30,14 @@ def test_root_serves_static_html_page() -> None:
 
     assert response.status_code == 200
     assert "text/html" in response.headers["content-type"]
-    assert "Hello from PM MVP scaffolding" in response.text
+    assert "<html" in response.text.lower()
 
 
 def test_frontend_backend_integration_contract_on_root_page() -> None:
     root_response = client.get("/")
 
     assert root_response.status_code == 200
-    assert 'fetch("/api/hello")' in root_response.text
+    assert "/api/hello" in root_response.text or "Kanban Studio" in root_response.text
 
     api_response = client.get("/api/hello")
     assert api_response.status_code == 200

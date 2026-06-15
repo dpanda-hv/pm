@@ -84,19 +84,27 @@ Part 2 evidence (15 June 2026, macOS):
 
 ### Checklist
 
-- [ ] Wire fully static Next export into Docker build output.
-- [ ] Serve exported assets from FastAPI at `/`.
-- [ ] Ensure existing demo Kanban renders correctly from static build.
-- [ ] Preserve current frontend behavior from baseline demo.
-- [ ] Add and run unit/integration tests for this integration.
+- [x] Wire fully static Next export into Docker build output.
+- [x] Serve exported assets from FastAPI at `/`.
+- [x] Ensure existing demo Kanban renders correctly from static build.
+- [x] Preserve current frontend behavior from baseline demo.
+- [x] Add and run unit/integration tests for this integration.
 - [ ] Request approval for Part 4.
 
 ### Tests
 
-- [ ] Frontend unit tests pass.
-- [ ] Frontend integration test confirms Kanban renders at `/` in container.
-- [ ] Static asset routing works for direct page reloads.
-- [ ] Coverage is at least 80% for frontend scope touched.
+- [x] Frontend unit tests pass.
+- [x] Frontend integration test confirms Kanban renders at `/` in container.
+- [x] Static asset routing works for direct page reloads.
+- [x] Coverage is at least 80% for frontend scope touched.
+
+Part 3 evidence (15 June 2026, macOS):
+
+- Containerized app serves exported frontend at `/` (heading `Kanban Studio` confirmed in integration tests).
+- Container integration tests passed via `frontend/tests/container/static_frontend_serving.spec.ts` using `npm run test:e2e:container`.
+- Frontend unit tests passed via `npm run test:unit`.
+- Backend tests passed via containerized `uv run pytest -q`.
+- Frontend source coverage from `npm run test:unit -- --coverage`: `All files` at `82.28%`.
 
 ### Success criteria
 
