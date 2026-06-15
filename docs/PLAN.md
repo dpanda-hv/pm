@@ -151,18 +151,25 @@ Part 4 evidence (15 June 2026, macOS):
 
 ### Checklist
 
-- [ ] Design SQLite schema using one board JSON blob per user.
-- [ ] Define JSON contract for board data including explicit card ordering.
-- [ ] Include default columns: To Do, In Progress, Blocked, In Review, Done.
-- [ ] Document rationale and tradeoffs in docs.
-- [ ] Include a future-phase note for normalized schema migration.
+- [x] Design SQLite schema using one board JSON blob per user.
+- [x] Define JSON contract for board data including explicit card ordering.
+- [x] Include default columns: To Do, In Progress, Blocked, In Review, Done.
+- [x] Document rationale and tradeoffs in docs.
+- [x] Include a future-phase note for normalized schema migration.
 - [ ] Request explicit user sign-off before Part 6.
 
 ### Tests
 
-- [ ] Schema validation tests for create/read/update lifecycle.
-- [ ] JSON serialization/deserialization test coverage.
-- [ ] Default board shape test for first-time user.
+- [x] Schema validation tests for create/read/update lifecycle.
+- [x] JSON serialization/deserialization test coverage.
+- [x] Default board shape test for first-time user.
+
+Part 5 evidence (15 June 2026):
+
+- Database design document added: `docs/DATABASE.md`.
+- Includes SQLite DDL, JSON board contract, write/read SQL patterns, validation invariants, and default board definition.
+- Includes implementation test plan for Part 6 covering lifecycle, serialization, defaults/order, and multi-user isolation.
+- Includes normalized-schema migration strategy for post-MVP phase.
 
 ### Success criteria
 
