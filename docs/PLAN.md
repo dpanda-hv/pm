@@ -48,21 +48,32 @@
 
 ### Checklist
 
-- [ ] Create one multi-stage Dockerfile for frontend build and backend runtime.
-- [ ] Scaffold FastAPI backend in `backend/` with basic health and sample API endpoint.
-- [ ] Implement basic static hello-world page served by FastAPI for smoke testing.
-- [ ] Add cross-platform start and stop scripts in `scripts/` for macOS, Linux, and Windows.
-- [ ] Add setup checks in scripts: environment file presence, port availability, and startup readiness checks.
-- [ ] Document commands in minimal README/docs updates.
+- [x] Create one multi-stage Dockerfile for frontend build and backend runtime.
+- [x] Scaffold FastAPI backend in `backend/` with basic health and sample API endpoint.
+- [x] Implement basic static hello-world page served by FastAPI for smoke testing.
+- [x] Add cross-platform start and stop scripts in `scripts/` for macOS, Linux, and Windows.
+- [x] Add setup checks in scripts: environment file presence, port availability, and startup readiness checks.
+- [x] Document commands in minimal README/docs updates.
 - [ ] Request approval for Part 3.
 
 ### Tests
 
-- [ ] Container build succeeds from clean state.
+- [x] Container build succeeds from clean state.
 - [ ] Container starts with script wrappers on supported OS paths.
-- [ ] `GET /health` returns success.
-- [ ] Sample API endpoint responds correctly.
-- [ ] Static hello-world content is reachable at `/`.
+- [x] `GET /health` returns success.
+- [x] Sample API endpoint responds correctly.
+- [x] Static hello-world content is reachable at `/`.
+
+Part 2 evidence (15 June 2026, macOS):
+
+- Docker image built successfully via `./scripts/start-mac.sh`.
+- Container readiness and endpoint checks succeeded:
+	- `GET /health` -> `{"status":"ok"}`
+	- `GET /api/hello` -> `{"message":"Hello from FastAPI"}`
+- Root page served static HTML and performed API fetch.
+- `./scripts/stop-mac.sh` removed container successfully.
+- Automated backend tests added and passing: `backend/tests/test_scaffolding_endpoints.py` (4 passed).
+- Linux and Windows scripts were authored but not executed in this macOS environment.
 
 ### Success criteria
 
