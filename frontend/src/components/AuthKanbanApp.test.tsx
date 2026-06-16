@@ -179,4 +179,159 @@ describe("AuthKanbanApp", () => {
       await screen.findByText(/unable to load board from backend/i)
     ).toBeInTheDocument();
   });
+
+  it("shows AI loading and assistant response states", async () => {
+    const fetchMock = vi.spyOn(globalThis, "fetch");
+    fetchMock
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ authenticated: true, username: "user" }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        })
+      )
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify(boardFixture), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        })
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            ok: true,
+            reply: "Moved one card.",
+            boardUpdated: false,
+            board: boardFixture,
+          }),
+          {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          }
+        )
+      );
+
+    render(<AuthKanbanApp />);
+
+    expect(await screen.findByRole("heading", { name: /kanban studio/i })).toBeInTheDocument();
+
+    await userEvent.type(screen.getByLabelText(/chat message/i), "Move a card to review");
+    await userEvent.click(screen.getByRole("button", { name: /send to ai/i }));
+
+    expect(screen.getByText("Move a card to review")).toBeInTheDocument();
+    expect(await screen.findByText("Moved one card.")).toBeInTheDocument();
+  });
+
+  it("shows AI error and retries last message", async () => {
+    const fetchMock = vi.spyOn(globalThis, "fetch");
+    fetchMock
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ authenticated: true, username: "user" }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        })
+      )
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify(boardFixture), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        })
+      )
+      .mockRejectedValueOnce(new Error("ai down"))
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            ok: true,
+            reply: "Retry succeeded.",
+            boardUpdated: false,
+            board: boardFixture,
+          }),
+          {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          }
+        )
+      );
+
+    render(<AuthKanbanApp />);
+
+    expect(await screen.findByRole("heading", { name: /kanban studio/i })).toBeInTheDocument();
+
+    await userEvent.type(screen.getByLabelText(/chat message/i), "Try AI update");
+    await userEvent.click(screen.getByRole("button", { name: /send to ai/i }));
+
+    expect(await screen.findByText(/ai request failed/i)).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: /retry last message/i }));
+
+    expect(await screen.findByText("Retry succeeded.")).toBeInTheDocument();
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenNthCalledWith(
+        4,
+        "/api/ai/chat",
+        expect.objectContaining({ method: "POST" })
+      );
+    });
+  });
+
+  it("applies AI board update and refreshes board from backend", async () => {
+    const fetchMock = vi.spyOn(globalThis, "fetch");
+    const updatedBoard = {
+      ...boardFixture,
+      columns: boardFixture.columns.map((column, index) =>
+        index === 0 ? { ...column, title: "Planned" } : column
+      ),
+    };
+
+    fetchMock
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ authenticated: true, username: "user" }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        })
+      )
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify(boardFixture), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        })
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            ok: true,
+            reply: "Updated board.",
+            boardUpdated: true,
+            board: updatedBoard,
+          }),
+          {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          }
+        )
+      )
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify(updatedBoard), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        })
+      );
+
+    render(<AuthKanbanApp />);
+
+    expect(await screen.findByRole("heading", { name: /kanban studio/i })).toBeInTheDocument();
+
+    await userEvent.type(screen.getByLabelText(/chat message/i), "Rename first column");
+    await userEvent.click(screen.getByRole("button", { name: /send to ai/i }));
+
+    expect(await screen.findByDisplayValue("Planned")).toBeInTheDocument();
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenNthCalledWith(
+        4,
+        "/api/board",
+        expect.objectContaining({ method: "GET" })
+      );
+    });
+  });
 });

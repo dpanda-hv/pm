@@ -322,20 +322,42 @@ Part 9 evidence (16 June 2026):
 
 ### Checklist
 
-- [ ] Build sidebar chat UI integrated with backend AI endpoint.
-- [ ] Show conversation with clear request/response states.
-- [ ] Apply AI board updates when returned by structured output.
-- [ ] Auto-refresh board state after AI updates.
-- [ ] Keep visual style aligned with project color scheme.
-- [ ] Add robust UI integration and end-to-end tests.
-- [ ] Final verification and handoff notes.
+- [x] Build sidebar chat UI integrated with backend AI endpoint.
+- [x] Show conversation with clear request/response states.
+- [x] Apply AI board updates when returned by structured output.
+- [x] Auto-refresh board state after AI updates.
+- [x] Keep visual style aligned with project color scheme.
+- [x] Add robust UI integration and end-to-end tests.
+- [x] Final verification and handoff notes.
 
 ### Tests
 
-- [ ] End-to-end chat interaction test including board mutation.
-- [ ] UI tests for loading, error, and retry states.
-- [ ] Regression test for manual drag/drop after AI update.
-- [ ] Coverage remains at least 80% for touched frontend scope.
+- [x] End-to-end chat interaction test including board mutation.
+- [x] UI tests for loading, error, and retry states.
+- [x] Regression test for manual drag/drop after AI update.
+- [x] Coverage remains at least 80% for touched frontend scope.
+
+Part 10 evidence (16 June 2026):
+
+- AI sidebar UX implemented in `frontend/src/components/AuthKanbanApp.tsx`:
+	- integrated `POST /api/ai/chat` request flow
+	- rendered user/assistant conversation stream with sending state (`Thinking...`)
+	- retry action for failed AI request (`Retry last message`)
+	- applies AI `board` payload when `boardUpdated=true`
+	- performs board refresh (`GET /api/board`) after AI-applied updates
+- Frontend unit tests expanded in `frontend/src/components/AuthKanbanApp.test.tsx`:
+	- AI request/response state coverage
+	- AI error + retry coverage
+	- board update + refresh call coverage
+- Container Playwright tests expanded with feature-based file:
+	- `frontend/tests/container/ai_sidebar_flow.spec.ts`
+	- includes chat mutation test and manual drag/drop regression after AI update
+- Existing container persistence test hardened against strict-mode duplicate text collisions:
+	- `frontend/tests/container/auth_session_flow.spec.ts`
+- Verification results:
+	- `npm run test:unit` -> `15 passed`
+	- `npm run test:e2e:container` -> `8 passed`
+	- `npm run test:unit -- --coverage` -> `All files 84.37%`
 
 ### Success criteria
 

@@ -37,6 +37,8 @@ test("logout returns user to login screen", async ({ page }) => {
 });
 
 test("persists board changes across page refresh", async ({ page }) => {
+  const cardTitle = `Persisted card ${Date.now()}`;
+
   await page.goto("/");
   await page.getByLabel("Username").fill("user");
   await page.getByLabel("Password").fill("password");
@@ -46,13 +48,13 @@ test("persists board changes across page refresh", async ({ page }) => {
 
   const firstColumn = page.locator('[data-testid^="column-"]').first();
   await firstColumn.getByRole("button", { name: /add a card/i }).click();
-  await firstColumn.getByPlaceholder("Card title").fill("Persisted card");
+  await firstColumn.getByPlaceholder("Card title").fill(cardTitle);
   await firstColumn.getByPlaceholder("Details").fill("Should survive refresh");
   await firstColumn.getByRole("button", { name: /add card/i }).click();
 
-  await expect(firstColumn.getByText("Persisted card")).toBeVisible();
+  await expect(firstColumn.getByText(cardTitle)).toBeVisible();
 
   await page.reload();
   await expect(page.getByRole("heading", { name: /kanban studio/i })).toBeVisible();
-  await expect(page.getByText("Persisted card")).toBeVisible();
+  await expect(page.getByText(cardTitle)).toBeVisible();
 });

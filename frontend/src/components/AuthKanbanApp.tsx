@@ -1,12 +1,24 @@
 "use client";
 
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { KanbanBoard } from "@/components/KanbanBoard";
 import type { BoardData } from "@/lib/kanban";
 
 type SessionResponse = {
   authenticated: boolean;
   username: string | null;
+};
+
+type AIChatResponse = {
+  ok: boolean;
+  reply: string;
+  boardUpdated: boolean;
+  board: BoardData;
+};
+
+type AIChatMessage = {
+  role: "user" | "assistant";
+  content: string;
 };
 
 export const AuthKanbanApp = () => {
@@ -20,6 +32,15 @@ export const AuthKanbanApp = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLoadingBoard, setIsLoadingBoard] = useState(false);
   const [board, setBoard] = useState<BoardData | null>(null);
+  const [chatInput, setChatInput] = useState("");
+  const [chatMessages, setChatMessages] = useState<AIChatMessage[]>([]);
+  const [chatError, setChatError] = useState<string | null>(null);
+  const [isSendingChat, setIsSendingChat] = useState(false);
+
+  const lastUserMessage = useMemo(
+    () => [...chatMessages].reverse().find((message) => message.role === "user")?.content,
+    [chatMessages]
+  );
 
   useEffect(() => {
     let isMounted = true;
@@ -106,52 +127,39 @@ export const AuthKanbanApp = () => {
     }
   };
 
+  const loadBoard = useCallback(async () => {
+    setIsLoadingBoard(true);
+    setBoardError(null);
+
+    try {
+      const response = await fetch("/api/board", {
+        method: "GET",
+        credentials: "same-origin",
+      });
+
+      if (!response.ok) {
+        throw new Error("board-load-failed");
+      }
+
+      const data = (await response.json()) as BoardData;
+      if (!data.columns || !data.cards) {
+        throw new Error("board-load-invalid");
+      }
+
+      setBoard(data);
+    } catch {
+      setBoardError("Unable to load board from backend.");
+    } finally {
+      setIsLoadingBoard(false);
+    }
+  }, []);
+
   useEffect(() => {
-    let isMounted = true;
-
-    const loadBoard = async () => {
-      if (!isAuthenticated) {
-        return;
-      }
-
-      setIsLoadingBoard(true);
-      setBoardError(null);
-
-      try {
-        const response = await fetch("/api/board", {
-          method: "GET",
-          credentials: "same-origin",
-        });
-
-        if (!response.ok) {
-          throw new Error("board-load-failed");
-        }
-
-        const data = (await response.json()) as BoardData;
-        if (!data.columns || !data.cards) {
-          throw new Error("board-load-invalid");
-        }
-
-        if (isMounted) {
-          setBoard(data);
-        }
-      } catch {
-        if (isMounted) {
-          setBoardError("Unable to load board from backend.");
-        }
-      } finally {
-        if (isMounted) {
-          setIsLoadingBoard(false);
-        }
-      }
-    };
-
+    if (!isAuthenticated) {
+      return;
+    }
     void loadBoard();
-
-    return () => {
-      isMounted = false;
-    };
-  }, [isAuthenticated]);
+  }, [isAuthenticated, loadBoard]);
 
   const onBoardChange = (nextBoard: BoardData) => {
     setBoard(nextBoard);
@@ -175,6 +183,67 @@ export const AuthKanbanApp = () => {
         setBoardError("Board changes could not be saved.");
       }
     })();
+  };
+
+  const runAIChat = async (message: string) => {
+    if (!message.trim()) {
+      return;
+    }
+
+    setChatError(null);
+    setIsSendingChat(true);
+    setChatMessages((previous) => [...previous, { role: "user", content: message }]);
+
+    try {
+      const response = await fetch("/api/ai/chat", {
+        method: "POST",
+        credentials: "same-origin",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ message }),
+      });
+
+      if (!response.ok) {
+        throw new Error("ai-chat-failed");
+      }
+
+      const data = (await response.json()) as AIChatResponse;
+      if (!data.reply || !data.board) {
+        throw new Error("ai-chat-invalid");
+      }
+
+      setChatMessages((previous) => [
+        ...previous,
+        { role: "assistant", content: data.reply },
+      ]);
+
+      if (data.boardUpdated) {
+        setBoard(data.board);
+        await loadBoard();
+      }
+    } catch {
+      setChatError("AI request failed. Try again.");
+    } finally {
+      setIsSendingChat(false);
+    }
+  };
+
+  const onSubmitAIChat = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const message = chatInput.trim();
+    if (!message) {
+      return;
+    }
+    setChatInput("");
+    void runAIChat(message);
+  };
+
+  const onRetryLastMessage = () => {
+    if (!lastUserMessage || isSendingChat) {
+      return;
+    }
+    void runAIChat(lastUserMessage);
   };
 
   if (isLoadingSession) {
@@ -273,7 +342,82 @@ export const AuthKanbanApp = () => {
           </p>
         </main>
       ) : (
-        <KanbanBoard board={board} onBoardChange={onBoardChange} />
+        <div className="mx-auto grid min-h-[calc(100vh-72px)] w-full max-w-[1700px] gap-6 px-4 pb-8 pt-6 xl:grid-cols-[minmax(0,1fr)_360px]">
+          <KanbanBoard board={board} onBoardChange={onBoardChange} />
+          <aside className="flex h-[calc(100vh-112px)] flex-col rounded-3xl border border-[var(--stroke)] bg-[var(--surface-strong)] p-4 shadow-[var(--shadow)]">
+            <div className="rounded-2xl border border-[var(--stroke)] bg-[var(--surface)] p-4">
+              <p className="text-xs font-semibold uppercase tracking-[0.25em] text-[var(--gray-text)]">
+                AI Copilot
+              </p>
+              <h2 className="mt-2 font-display text-2xl font-semibold text-[var(--navy-dark)]">
+                Board Assistant
+              </h2>
+              <p className="mt-2 text-sm leading-6 text-[var(--gray-text)]">
+                Ask for card moves, edits, or summaries. Any valid board update is applied and refreshed.
+              </p>
+            </div>
+
+            <div className="mt-4 flex-1 space-y-3 overflow-y-auto pr-1" aria-live="polite">
+              {chatMessages.length === 0 ? (
+                <p className="rounded-2xl border border-dashed border-[var(--stroke)] px-4 py-5 text-sm text-[var(--gray-text)]">
+                  Try: "Move all blocked cards to In Review" or "Create a release checklist card in To Do".
+                </p>
+              ) : null}
+              {chatMessages.map((message, index) => (
+                <div
+                  key={`${message.role}-${index}-${message.content}`}
+                  className={
+                    message.role === "user"
+                      ? "ml-auto max-w-[92%] rounded-2xl bg-[var(--secondary-purple)] px-4 py-3 text-sm text-white"
+                      : "mr-auto max-w-[92%] rounded-2xl border border-[var(--stroke)] bg-white px-4 py-3 text-sm text-[var(--navy-dark)]"
+                  }
+                >
+                  {message.content}
+                </div>
+              ))}
+              {isSendingChat ? (
+                <p className="mr-auto inline-flex rounded-2xl border border-[var(--stroke)] bg-white px-4 py-3 text-sm font-semibold text-[var(--primary-blue)]">
+                  Thinking...
+                </p>
+              ) : null}
+            </div>
+
+            {chatError ? (
+              <div className="mt-3 rounded-xl border border-[var(--secondary-purple)]/30 bg-[var(--secondary-purple)]/10 p-3">
+                <p className="text-sm font-semibold text-[var(--secondary-purple)]">{chatError}</p>
+                <button
+                  type="button"
+                  onClick={onRetryLastMessage}
+                  disabled={!lastUserMessage || isSendingChat}
+                  className="mt-2 rounded-lg border border-[var(--secondary-purple)] px-3 py-2 text-xs font-semibold uppercase tracking-[0.12em] text-[var(--secondary-purple)] transition hover:bg-[var(--secondary-purple)] hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  Retry last message
+                </button>
+              </div>
+            ) : null}
+
+            <form className="mt-4" onSubmit={onSubmitAIChat}>
+              <label className="sr-only" htmlFor="ai-message-input">
+                Chat message
+              </label>
+              <textarea
+                id="ai-message-input"
+                value={chatInput}
+                onChange={(event) => setChatInput(event.target.value)}
+                placeholder="Ask AI to update the board..."
+                rows={3}
+                className="w-full resize-none rounded-2xl border border-[var(--stroke)] px-4 py-3 text-sm text-[var(--navy-dark)] outline-none focus:border-[var(--primary-blue)]"
+              />
+              <button
+                type="submit"
+                disabled={isSendingChat || !chatInput.trim()}
+                className="mt-3 w-full rounded-xl bg-[var(--primary-blue)] px-4 py-3 text-sm font-semibold text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-55"
+              >
+                {isSendingChat ? "Sending..." : "Send to AI"}
+              </button>
+            </form>
+          </aside>
+        </div>
       )}
     </>
   );
