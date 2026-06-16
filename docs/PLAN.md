@@ -12,6 +12,9 @@
 - Card order is persisted and preserved during user and AI moves.
 - Chat history persistence is in-memory for MVP.
 - AI response format must be strict structured output schema with validation and fallback handling.
+- Authenticated board view includes an AI sidebar chat integrated with backend AI endpoint.
+- AI chat failures expose user-facing retry of the last message.
+- When AI returns board updates, frontend applies returned board and then refreshes from backend source of truth.
 - Minimum test coverage target is 80% and integration testing must be robust.
 - Start and stop scripts must include lifecycle plus setup checks/tasks.
 - `frontend/AGENTS.md` must be descriptive and future-proof.
